@@ -7,6 +7,18 @@ const authSchema = new mongoose.Schema(
     role: { type: String, required: true },
     password: { type: String, required: true },
     image: { type: Object },
+    approved_songs: [
+      {
+        type: mongoose.Types.ObjectId,
+        ref: "song",
+      },
+    ],
+    pending_songs: [
+      {
+        type: mongoose.Types.ObjectId,
+        ref: "song",
+      },
+    ],
   },
   {
     timestamps: true,
