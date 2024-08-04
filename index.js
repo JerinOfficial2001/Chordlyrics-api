@@ -20,4 +20,6 @@ mongoose.connect(MONGO).then((res) => console.log("DB CONNECTED"));
 //     .json({ status: "ok", message: "Chordlyrics server is running" });
 // });
 const Auth = require("./routes/auth");
+const Song = require("./routes/song");
 app.use("/chordlyrics/auth", Auth);
+app.use("/chordlyrics/song", Song);
