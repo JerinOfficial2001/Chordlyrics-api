@@ -9,7 +9,7 @@ exports.login = async (req, res) => {
 
   try {
     if (email && password) {
-      const User = await auth.findOne({ email });
+      const User = await auth.findOne({ email: email.toLowerCase() });
       if (User) {
         if (User.password != password) {
           res.status(200).json({
@@ -46,10 +46,10 @@ exports.register = async (req, res) => {
 
   try {
     if (email && password && name) {
-      const User = await auth.findOne({ email });
+      const User = await auth.findOne({ email: email.toLowerCase() });
       if (!User) {
         const userDatas = {
-          email,
+          email: email.toLowerCase(),
           password,
           role: "User",
           name,
