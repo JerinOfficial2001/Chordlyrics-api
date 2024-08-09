@@ -11,13 +11,20 @@ exports.login = async (req, res) => {
     if (email && password) {
       const User = await auth.findOne({ email });
       if (User) {
-        const token = jwt.sign({ userId: User._id }, SECRET_KEY, {
-          expiresIn: "24h",
-        });
-        res.status(200).json({
-          status: "ok",
-          token,
-        });
+        if (User.password != password) {
+          res.status(200).json({
+            status: "error",
+            message: "Incorrect password",
+          });
+        } else {
+          const token = jwt.sign({ userId: User._id }, SECRET_KEY, {
+            expiresIn: "24h",
+          });
+          res.status(200).json({
+            status: "ok",
+            token,
+          });
+        }
       } else {
         res.status(200).json({
           status: "ok",
@@ -38,13 +45,13 @@ exports.register = async (req, res) => {
   const { email, password, role, name, image } = req.body;
 
   try {
-    if (email && password && role && name) {
+    if (email && password && name) {
       const User = await auth.findOne({ email });
       if (!User) {
         const userDatas = {
           email,
           password,
-          role,
+          role: "User",
           name,
           image: null,
         };
@@ -107,7 +114,21 @@ exports.userData = async (req, res) => {
       const decoded = jwt.verify(token, SECRET_KEY);
       const user = await auth.findById(decoded.userId);
       if (user) {
-        res.status(200).json({ status: "ok", data: user });
+        res.status(200).json({
+          status: "ok",
+          data: {
+            email: user.email,
+            password: user.password,
+            image: user.image,
+            role: user.role,
+            accessToken: token,
+            _id: user._id,
+            approved_songs: user.approved_songs,
+            pending_songs: user.pending_songs,
+            name: user.name,
+            createdAt: user.createdAt,
+          },
+        });
       } else {
         res.status(200).json({
           status: "error",
@@ -151,6 +172,32 @@ exports.deleteAccount = async (req, res) => {
         res.status(200).json({
           status: "error",
           message: "User not exist",
+        });
+      }
+    } else {
+      res.status(200).json({ status: "error", message: "Unauthorized" });
+    }
+  } catch (error) {
+    console.log(error, "register");
+    res.status(500).json({ error: "Internal Server Error" });
+  }
+};
+exports.getUserById = async (req, res) => {
+  const { userId } = req.query;
+  const token = req.headers.authorization?.replace("Bearer ", "");
+
+  try {
+    if (isAuthenticated(token, userId)) {
+      const User = await auth.findById(req.params.id);
+      if (User) {
+        res.status(200).json({
+          status: "ok",
+          data: User,
+        });
+      } else {
+        res.status(200).json({
+          status: "error",
+          message: "Invalid Id",
         });
       }
     } else {

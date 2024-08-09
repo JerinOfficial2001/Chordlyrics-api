@@ -8,6 +8,7 @@ const {
   register,
   userData,
   deleteAccount,
+  getUserById,
 } = require("../controllers/auth");
 
 const storage = new CloudinaryStorage({
@@ -21,6 +22,7 @@ const upload = multer({ storage: storage });
 router.post("/login", login);
 router.post("/register", upload.single("image"), register);
 router.get("/userData", userData);
+router.get("/getUser/:id", getUserById);
 router.delete("/delete/:userId", deleteAccount);
 router.put("/:id", upload.single("image"));
 
