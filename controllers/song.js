@@ -502,6 +502,22 @@ exports.getPendingSongs = async (req, res) => {
     res.status(500).json({ error: "Internal Server Error" });
   }
 };
+exports.getPinnedSongs = async (req, res) => {
+  const { userId } = req.query;
+  const token = req.headers.authorization?.replace("Bearer ", "");
+  try {
+    if (await isAuthenticated(token, userId).then((data) => data)) {
+      const songs = await auth.findById(userId).populate("pinned_songs");
+
+      res.status(200).json({ status: "ok", data: songs.pinned_songs });
+    } else {
+      res.status(200).json({ status: "error", message: "Unauthorized" });
+    }
+  } catch (error) {
+    console.log(error, "addSong");
+    res.status(500).json({ error: "Internal Server Error" });
+  }
+};
 exports.deleteSong = async (req, res) => {
   const { userId } = req.query;
   const token = req.headers.authorization?.replace("Bearer ", "");

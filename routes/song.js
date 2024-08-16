@@ -15,6 +15,7 @@ const {
   updateSong,
   pinSong,
   deleteSong,
+  getPinnedSongs,
 } = require("../controllers/song");
 const router = express.Router();
 
@@ -29,6 +30,7 @@ router.get("/getPendingSongs", getPendingSongs);
 router.get("/getMySongs", getMySongs);
 router.get("/getMyPendingSongs", getMyPendingSongs);
 router.get("/getApprovedSongs", getApprovedSongs);
+router.get("/getPinnedSongs", getPinnedSongs);
 router.put("/updateSong/:id", updateSong);
 router.put("/pinsong/:id", pinSong);
 
