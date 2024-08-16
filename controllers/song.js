@@ -508,8 +508,17 @@ exports.getPinnedSongs = async (req, res) => {
   try {
     if (await isAuthenticated(token, userId).then((data) => data)) {
       const songs = await auth.findById(userId).populate("pinned_songs");
-
-      res.status(200).json({ status: "ok", data: songs.pinned_songs });
+      const pinnedSongs = songs.pending_songs.map((elem) => {
+        if (userId) {
+          elem.isPinned = Array.isArray(elem.isPinned)
+            ? elem.isPinned.some((id) => id.toString() === userId)
+            : false;
+        } else {
+          elem.isPinned = false;
+        }
+        return elem;
+      });
+      res.status(200).json({ status: "ok", data: pinnedSongs });
     } else {
       res.status(200).json({ status: "error", message: "Unauthorized" });
     }
