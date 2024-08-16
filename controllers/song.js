@@ -174,7 +174,6 @@ exports.addSong = async (req, res) => {
     style,
     beat,
     status,
-    isPinned,
     language,
     keyboardModal,
     lyrics,
@@ -186,8 +185,8 @@ exports.addSong = async (req, res) => {
       tempo,
       style,
       beat,
-      status,
-      isPinned,
+      status: "",
+      isPinned: [],
       language,
       keyboardModal,
       lyrics,
@@ -195,12 +194,17 @@ exports.addSong = async (req, res) => {
     };
     if (await isAuthenticated(token, userId).then((data) => data)) {
       if (
-        (title,
-        scale && tempo && style && beat && language && keyboardModal && lyrics)
+        title &&
+        scale &&
+        tempo &&
+        style &&
+        beat &&
+        language &&
+        keyboardModal &&
+        lyrics
       ) {
         const userData = await auth.findById(userId);
         DatasToAdd.status = "pending";
-        DatasToAdd.isPinned = false;
         const result = await song.create(DatasToAdd);
         if (result) {
           userData.pending_songs.push(result._id);
@@ -566,28 +570,31 @@ exports.deleteSong = async (req, res) => {
         }
         result = await song.findByIdAndDelete(req.params.id);
       } else {
-        if (
-          userData.pending_songs &&
-          userData.pending_songs.toString().includes(req.params.id)
-        ) {
-          if (
-            userData.pinned_songs &&
-            userData.pinned_songs.toString().includes(req.params.id)
-          ) {
-            userData.pinned_songs = userData.pinned_songs.filter(
-              (elem) => elem.toString() != req.params.id
-            );
-          }
+        const songData = await song.findById(req.params.id);
+        if (songData && songData.status != "active") {
           if (
             userData.pending_songs &&
             userData.pending_songs.toString().includes(req.params.id)
           ) {
-            userData.pending_songs = userData.pending_songs.filter(
-              (elem) => elem.toString() != req.params.id
-            );
+            if (
+              userData.pinned_songs &&
+              userData.pinned_songs.toString().includes(req.params.id)
+            ) {
+              userData.pinned_songs = userData.pinned_songs.filter(
+                (elem) => elem.toString() != req.params.id
+              );
+            }
+            if (
+              userData.pending_songs &&
+              userData.pending_songs.toString().includes(req.params.id)
+            ) {
+              userData.pending_songs = userData.pending_songs.filter(
+                (elem) => elem.toString() != req.params.id
+              );
+            }
+            userData.save();
+            result = await song.findByIdAndDelete(req.params.id);
           }
-          userData.save();
-          result = await song.findByIdAndDelete(req.params.id);
         }
       }
       if (result) {
