@@ -1,28 +1,39 @@
 const { auth } = require("../model/auth");
 const { song } = require("../model/song");
 const { param } = require("../routes/song");
-const { isAuthenticated } = require("../utils/isAuthenticated");
-
+const {
+  isAuthenticated,
+  getUserIdFromToken,
+} = require("../utils/isAuthenticated");
 exports.getSongs = async (req, res) => {
   try {
-    const songs = await song.find({ status: "active" });
+    const songs = await song.find({ status: "active" }).lean();
+    const token = req.headers.authorization?.replace("Bearer ", "");
+    const userID = token ? await getUserIdFromToken(token) : null;
+
+    const sortedSongs = songs
+      .sort((a, b) => a.title.localeCompare(b.title))
+      .map((elem) => {
+        if (userID) {
+          elem.isPinned = Array.isArray(elem.isPinned)
+            ? elem.isPinned.some((id) => id.toString() === userID.toString())
+            : false;
+        } else {
+          elem.isPinned = false;
+        }
+        return elem;
+      });
+
     res.status(200).json({
       status: "ok",
-      data: songs.sort((a, b) => {
-        if (a.title < b.title) {
-          return -1;
-        }
-        if (a.title > b.title) {
-          return 1;
-        }
-        return 0;
-      }),
+      data: sortedSongs,
     });
   } catch (error) {
-    console.log(error, "addSong");
+    console.log(error, "getSongs");
     res.status(500).json({ error: "Internal Server Error" });
   }
 };
+
 exports.getKeyboard = async (req, res) => {
   try {
     const allActiveSongs = await song.find({ status: "active" });
@@ -56,7 +67,7 @@ exports.getLanguages = async (req, res) => {
 exports.getSongIndex = async (req, res) => {
   const { language } = req.query;
   try {
-    const allSongs = await song.find({});
+    const allSongs = await song.find({ status: "active" });
     const filteredSongs = allSongs.filter((i) => i.language == language);
 
     const titleCounts = {};
@@ -97,12 +108,13 @@ exports.getSongIndex = async (req, res) => {
 exports.getSongsTitle = async (req, res) => {
   const { index } = req.query;
   try {
-    const allSongs = await song.find({});
+    const allSongs = await song.find({}).lean();
     const filteredSongs = allSongs.filter((i) => i.title.charAt(0) == index);
+    const token = req.headers.authorization?.replace("Bearer ", "");
+    const userID = token ? await getUserIdFromToken(token) : null;
 
-    res.status(200).json({
-      status: "ok",
-      data: filteredSongs.sort((a, b) => {
+    const sortedSongs = filteredSongs
+      .sort((a, b) => {
         if (a.title < b.title) {
           return -1;
         }
@@ -110,7 +122,20 @@ exports.getSongsTitle = async (req, res) => {
           return 1;
         }
         return 0;
-      }),
+      })
+      .map((elem) => {
+        if (userID) {
+          elem.isPinned = Array.isArray(elem.isPinned)
+            ? elem.isPinned.some((id) => id.toString() === userID.toString())
+            : false;
+        } else {
+          elem.isPinned = false;
+        }
+        return elem;
+      });
+    res.status(200).json({
+      status: "ok",
+      data: sortedSongs,
     });
   } catch (error) {
     console.log(error, "addSong");
@@ -119,8 +144,16 @@ exports.getSongsTitle = async (req, res) => {
 };
 exports.getSong = async (req, res) => {
   try {
-    const result = await song.findById(req.params.id);
-
+    const token = req.headers.authorization?.replace("Bearer ", "");
+    const userID = token ? await getUserIdFromToken(token) : null;
+    const result = await song.findById(req.params.id).lean();
+    if (userID) {
+      result.isPinned = Array.isArray(result.isPinned)
+        ? result.isPinned.some((id) => id.toString() === userID.toString())
+        : false;
+    } else {
+      result.isPinned = false;
+    }
     res.status(200).json({
       status: "ok",
       data: result,
@@ -302,7 +335,6 @@ exports.updateSong = async (req, res) => {
                 userData.approved_songs = userData.approved_songs.filter(
                   (songId) => !songId.equals(result._id)
                 );
-                console.log(userData.approved_songs);
                 userData.pending_songs.push(result._id);
               }
             }
@@ -324,6 +356,70 @@ exports.updateSong = async (req, res) => {
         res
           .status(200)
           .json({ status: "error", message: "All fields are mandatory" });
+      }
+    } else {
+      res.status(200).json({ status: "error", message: "Unauthorized" });
+    }
+  } catch (error) {
+    console.log(error, "addSong");
+    res.status(500).json({ error: "Internal Server Error" });
+  }
+};
+exports.pinSong = async (req, res) => {
+  const { userId } = req.query;
+  const token = req.headers.authorization?.replace("Bearer ", "");
+  const { isPinned } = req.body;
+  try {
+    if (await isAuthenticated(token, userId).then((data) => data)) {
+      const userData = await auth.findById(userId);
+      const songObj = await song.findById(req.params.id);
+      if (songObj) {
+        if (!songObj.isPinned) {
+          songObj.isPinned = [];
+        }
+        if (!userData.pinned_songs) {
+          userData.pinned_songs = [];
+        }
+        if (isPinned) {
+          if (songObj.isPinned && !songObj.isPinned.includes(userData._id)) {
+            songObj.isPinned.push(userData._id);
+          }
+          if (
+            userData.pinned_songs &&
+            !userData.pinned_songs.includes(songObj._id)
+          ) {
+            userData.pinned_songs.push(songObj._id);
+          }
+        } else {
+          if (songObj.isPinned && songObj.isPinned.includes(userData._id)) {
+            songObj.isPinned = songObj.isPinned.filter(
+              (elem) => elem.toString() != userData._id.toString()
+            );
+          }
+          if (
+            userData.pinned_songs &&
+            userData.pinned_songs.includes(songObj._id)
+          ) {
+            userData.pinned_songs = userData.pinned_songs.filter(
+              (elem) => elem.toString() != songObj._id.toString()
+            );
+          }
+        }
+        const result = await song.findByIdAndUpdate(req.params.id, songObj);
+        if (result) {
+          userData.save();
+          res.status(200).json({
+            status: "ok",
+            message: isPinned ? "Song pinned" : "Song unpinned",
+          });
+        } else {
+          res.status(200).json({
+            status: "error",
+            message: "Something went wrong",
+          });
+        }
+      } else {
+        res.status(200).json({ status: "error", message: "Song not found" });
       }
     } else {
       res.status(200).json({ status: "error", message: "Unauthorized" });
@@ -398,6 +494,87 @@ exports.getPendingSongs = async (req, res) => {
         userName: userMap[song.user_id],
       }));
       res.status(200).json({ status: "ok", data: SongsWithUserName });
+    } else {
+      res.status(200).json({ status: "error", message: "Unauthorized" });
+    }
+  } catch (error) {
+    console.log(error, "addSong");
+    res.status(500).json({ error: "Internal Server Error" });
+  }
+};
+exports.deleteSong = async (req, res) => {
+  const { userId } = req.query;
+  const token = req.headers.authorization?.replace("Bearer ", "");
+  try {
+    if (await isAuthenticated(token, userId).then((data) => data)) {
+      const userData = await auth.findById(userId);
+      const allUsers = await auth.find({});
+      let result;
+      if (userData.role == "ADMIN") {
+        for (let user of allUsers) {
+          if (
+            user.pinned_songs &&
+            user.pinned_songs.toString().includes(req.params.id)
+          ) {
+            user.pinned_songs = user.pinned_songs.filter(
+              (elem) => elem.toString() != req.params.id
+            );
+          }
+          if (
+            user.approved_songs &&
+            user.approved_songs.toString().includes(req.params.id)
+          ) {
+            user.approved_songs = user.approved_songs.filter(
+              (elem) => elem.toString() != req.params.id
+            );
+          }
+          if (
+            user.pending_songs &&
+            user.pending_songs.toString().includes(req.params.id)
+          ) {
+            user.pending_songs = user.pending_songs.filter(
+              (elem) => elem.toString() != req.params.id
+            );
+          }
+          user.save();
+        }
+        result = await song.findByIdAndDelete(req.params.id);
+      } else {
+        if (
+          userData.pending_songs &&
+          userData.pending_songs.toString().includes(req.params.id)
+        ) {
+          if (
+            userData.pinned_songs &&
+            userData.pinned_songs.toString().includes(req.params.id)
+          ) {
+            userData.pinned_songs = userData.pinned_songs.filter(
+              (elem) => elem.toString() != req.params.id
+            );
+          }
+          if (
+            userData.pending_songs &&
+            userData.pending_songs.toString().includes(req.params.id)
+          ) {
+            userData.pending_songs = userData.pending_songs.filter(
+              (elem) => elem.toString() != req.params.id
+            );
+          }
+          userData.save();
+          result = await song.findByIdAndDelete(req.params.id);
+        }
+      }
+      if (result) {
+        res.status(200).json({
+          status: "ok",
+          message: "Song deleted successfully",
+        });
+      } else {
+        res.status(200).json({
+          status: "error",
+          message: "Only admins could delete this song",
+        });
+      }
     } else {
       res.status(200).json({ status: "error", message: "Unauthorized" });
     }

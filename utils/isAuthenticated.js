@@ -12,3 +12,12 @@ exports.isAuthenticated = async (token, userid) => {
     return true;
   }
 };
+exports.getUserIdFromToken = async (token) => {
+  if (token) {
+    const decoded = jwt.verify(token, SECRET_KEY);
+    const user = await auth.findById(decoded.userId);
+    return user ? user._id : null;
+  } else {
+    return null;
+  }
+};

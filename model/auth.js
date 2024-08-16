@@ -19,6 +19,12 @@ const authSchema = new mongoose.Schema(
         ref: "song",
       },
     ],
+    pinned_songs: [
+      {
+        type: mongoose.Types.ObjectId,
+        ref: "song",
+      },
+    ],
   },
   {
     timestamps: true,

@@ -13,6 +13,8 @@ const {
   getKeyboard,
   getMySongs,
   updateSong,
+  pinSong,
+  deleteSong,
 } = require("../controllers/song");
 const router = express.Router();
 
@@ -28,9 +30,10 @@ router.get("/getMySongs", getMySongs);
 router.get("/getMyPendingSongs", getMyPendingSongs);
 router.get("/getApprovedSongs", getApprovedSongs);
 router.put("/updateSong/:id", updateSong);
+router.put("/pinsong/:id", pinSong);
 
 router.post("/addSong", addSong);
-router.delete("/delete/:id");
+router.delete("/delete/:id", deleteSong);
 router.put("/approveSong", approveSongs);
 
 module.exports = router;
