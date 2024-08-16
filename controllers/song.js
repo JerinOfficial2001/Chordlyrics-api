@@ -487,7 +487,7 @@ exports.getPendingSongs = async (req, res) => {
       const songs = await song.find({ status: "pending" });
       const uniqueUserIDs = [...new Set(songs.map((song) => song.user_id))];
       const users = await auth.find({
-        _id: { $in: ["66af458624280ff49b455318", "66af507ba81691fc5d2f8b84"] },
+        _id: { $in: uniqueUserIDs },
       });
       const userMap = users.reduce((map, user) => {
         map[user._id] = user.name;
